@@ -5,6 +5,8 @@
 2. implemnation of deepspeed
    
 3. creating an new dataset for indian
+
+4. traning an tokenzier custom - (optional)
    
 5. creating an new translation transformer for the translation
    
