@@ -15,3 +15,10 @@
 
 # completed!
 1. just flash attention with working model - 5/11/24
+
+
+
+
+#traning
+#6/11/24 - 13:58 - pid #9358
+dataset - 1065519731 at 1024
