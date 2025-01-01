@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+# from flash_attention import FlashAttention  # Import Flash Attention 3
+
 def apply_rotary_emb(x: torch.Tensor, dim: int, theta: float = 10000.0) -> torch.Tensor:
     """
     Applies rotary embeddings to the input tensor.
@@ -111,26 +113,11 @@ class MQA(nn.Module):
         k = xk.transpose(1, 2)
         v = xv.transpose(1, 2)
 
-        # Calculate attention logits
-        logits = torch.matmul(q, k.transpose(2, 3))
-
-        # Scale logits by the square root of head dimension
-        logits *= 0.08838834764831845
-
-        # Apply scaling and clipping using tanh to stabilize softmax
-        max_attn_val = torch.tensor(30.0, dtype=logits.dtype, device=logits.device)
-        logits = max_attn_val * torch.tanh(logits / max_attn_val)
-
-        # Apply lower-triangular mask to attention logits
-        mask = self.mask[..., :input_len, :input_len].to(logits.device)
-        replacement_tensor = torch.tensor(-1e30, device=logits.device, dtype=logits.dtype)
-        logits = torch.where(mask.expand_as(logits), logits, replacement_tensor)
-
-        # Apply softmax to obtain attention scores
-        scores = F.softmax(logits, dim=-1)
-
-        # Weighted sum of values based on attention scores
-        output = torch.matmul(scores, v)
+        # Use standard attention calculation instead of Flash Attention 3
+        attn_weights = torch.matmul(q, k.transpose(-2, -1)) / (self.head_dim ** 0.5)
+        attn_weights = attn_weights.masked_fill(self.mask[:, :, :input_len, :input_len] == 0, float('-inf'))
+        attn_weights = F.softmax(attn_weights, dim=-1)
+        output = torch.matmul(attn_weights, v)
 
         # Reshape attention output to combine heads back into hidden dimension
         output = output.transpose(1, 2).contiguous().view(batch_size, input_len, -1)
@@ -260,4 +247,4 @@ class MoELayer(nn.Module):
         MoE_output = (output_masked * routing_probs_expanded).sum(dim=2)
 
         return MoE_output, routing_probs  # Also output routing_probs to be used in the loss function later
-    
+
